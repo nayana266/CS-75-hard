@@ -8,28 +8,70 @@ export default function Home() {
   const [hoveredApp, setHoveredApp] = useState<number | null>(null);
   const [showJournal, setShowJournal] = useState(false);
   const [cs75Hover, setCs75Hover] = useState(false);
+  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
+  const [currentDay, setCurrentDay] = useState(54);
   const [tasks, setTasks] = useState<{
     text: string;
     completed: boolean;
   }[]>([
-    // Start with an empty list
+    // Add default tasks
+    { text: "3 LeetCode problems", completed: false },
+    { text: "1 internship", completed: false },
+    { text: "1 hour on personal project", completed: false },
   ]);
   const [newTaskText, setNewTaskText] = useState("");
-  const [notePosition, setNotePosition] = useState({ top: '120px', left: 'calc(50% + 180px)' }); // Initial position as strings
+  const [notePosition, setNotePosition] = useState({ top: '280px', left: '60px' }); // Adjusted position to be lower and more to the left
   const [isDragging, setIsDragging] = useState(false);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
   // State and handlers for Login Modal
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginMessage, setLoginMessage] = useState<string | null>(null);
 
+  // State for LeetCode tooltip
+  const [showLeetCodeTooltip, setShowLeetCodeTooltip] = useState(false);
+
+  // State for Login tooltip
+  const [showLoginTooltip, setShowLoginTooltip] = useState(false);
+
+  // New state to track if settings icon has been clicked
+  const [hasClickedSettings, setHasClickedSettings] = useState(false);
+
+  // State for activity data
+  const [activityData, setActivityData] = useState<boolean[][]>([]);
+
   const backgroundColor = darkMode ? "#333" : "#fff";
   const lineColor = darkMode ? "#4b4a4a" : "#eee";
   const textColor = darkMode ? "#fff" : "#000";
+
+  // Generate activity data on the client side after mount
+  React.useEffect(() => {
+    const generateActivityData = () => {
+      const data: boolean[][] = [];
+      // Generate data for approx. 53 weeks
+      for (let i = 0; i < 53; i++) {
+        const week: boolean[] = [];
+        // Generate data for 7 days a week
+        for (let j = 0; j < 7; j++) {
+          // Mock data for coloring - replace with real logic later
+          const isCompleted = Math.random() > 0.7; // Randomly true ~30% of the time
+          week.push(isCompleted);
+        }
+        data.push(week);
+      }
+      setActivityData(data);
+    };
+
+    // Only run on the client
+    if (typeof window !== 'undefined') {
+      generateActivityData();
+    }
+  }, []); // Empty dependency array means this runs once on mount
 
   const handleAddTask = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && newTaskText.trim() !== '') {
@@ -51,9 +93,21 @@ export default function Home() {
     if (error) {
       setLoginError(error.message);
     } else if (data.user) {
-      setLoginMessage('Sign up successful! Please check your email to confirm.');
+       // Signup successful, now insert into 'users' table
+       const { data: insertData, error: insertError } = await supabase.from('users').insert([{ id: data.user.id }]);
+
+       if (insertError) {
+         console.error('Error inserting user into profile table:', insertError);
+         setLoginError('Sign up successful, but failed to create user profile.');
+         setLoginMessage(null);
+       } else {
+         setLoginMessage('Sign up successful! Please check your email to confirm.');
+         setLoginError(null); // Clear any previous errors
+       }
     } else {
-      setLoginMessage('Sign up successful! Please check your email to confirm.');
+      // This else block might be hit in unusual cases, keep existing message or refine
+      setLoginMessage('Sign up process started. Please check your email to confirm.');
+      setLoginError(null);
     }
   };
 
@@ -177,6 +231,7 @@ export default function Home() {
               }}
               onClick={() => {
                 if (folder.label === "Journal") setShowJournal(true);
+                if (folder.label === "Daily Tasks") setShowInstructionsModal(true);
               }}
             />
             <p
@@ -192,6 +247,105 @@ export default function Home() {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* GitHub-style Activity Graph */}
+      <div style={{
+        position: "absolute",
+        top: "calc(50% + 60px)", // Position below the centered CS75HARD text
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "auto", // Adjust width based on content
+        padding: '20px',
+        background: darkMode ? "#2d2d2d" : "#ededed", // Dark or light background
+        borderRadius: '10px',
+        boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+        color: textColor,
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}>
+        {/* Title and Stats */}
+        <div style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '15px',
+          fontSize: '14px',
+        }}>
+          <div style={{ fontWeight: 'bold', fontSize: '16px' }}>
+            Activity in the past year <span style={{ fontSize: '12px', color: darkMode ? '#aaa' : '#555', cursor: 'help' }}>ⓘ</span>
+          </div>
+          <div style={{ color: darkMode ? '#ccc' : '#333' }}>
+            {/* These stats would be dynamic in a real app */}
+            Total active days: <span style={{ fontWeight: 'bold' }}>--</span> Max streak: <span style={{ fontWeight: 'bold' }}>--</span>
+          </div>
+        </div>
+
+        {/* Activity Grid */}
+        <div style={{
+          display: 'flex',
+          gap: '2px', // Gap between week columns
+        }}>
+           {/* Days of the week labels - Optional, but common */}
+           {/*
+           <div style={{
+             display: 'flex', 
+             flexDirection: 'column', 
+             gap: '2px', 
+             fontSize: '10px', 
+             color: darkMode ? '#aaa' : '#555',
+             textAlign: 'right',
+             paddingRight: '4px',
+             justifyContent: 'space-between',
+             height: 'calc(10px * 7 + 2px * 6)', // Match grid height
+           }}>
+               <span>Mon</span>
+               <span>Wed</span>
+               <span>Fri</span>
+           </div>
+           */}
+
+          {/* Render Grid based on activityData state */}
+          {activityData.map((week, weekIndex) => (
+            <div key={weekIndex} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+               {week.map((isCompleted, dayIndex) => {
+                 const color = isCompleted 
+                               ? '#5AC8FA' // Use the CS75HARD hover blue
+                               : (darkMode ? '#1b1b1b' : '#ebedef'); // Grey for incomplete
+
+                 return (
+                   <div 
+                     key={`${weekIndex}-${dayIndex}`}
+                     style={{
+                       width: '10px',
+                       height: '10px',
+                       background: color,
+                       borderRadius: '2px',
+                     }}
+                   />
+                 );
+               })}
+            </div>
+          ))}
+        </div>
+         {/* Month Labels - Approximate positioning */}
+        <div style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: '12px',
+          marginTop: '5px',
+          padding: '0 5px', // Match grid padding
+          color: darkMode ? '#ccc' : '#333',
+        }}>
+          {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => (
+            // Approximate width for month columns - needs more precise calculation for perfect alignment
+            <span key={month} style={{ width: 'calc(10px * 4 + 2px * 3)', textAlign: 'center' }}>{month}</span> 
+          ))}
+        </div>
       </div>
 
       {/* macOS-style Dock with custom icons and colored blocks */}
@@ -239,16 +393,83 @@ export default function Home() {
           let itemElement;
           if (item.type === 'icon') {
             itemElement = (
-              <img
-                src={item.src}
-                alt={item.alt}
-                style={{
-                  ...itemStyles,
-                  objectFit: "cover",
-                }}
-                onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.1)")}
-                onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
-              />
+              <div style={{ position: 'relative' }} // Wrapper for relative positioning of tooltip
+                 onMouseEnter={() => { // Add mouse enter to wrapper
+                   if (item.alt === "Settings") setShowLoginTooltip(true);
+                 }}
+                 onMouseLeave={() => { // Add mouse leave to wrapper
+                   if (item.alt === "Settings") setShowLoginTooltip(false);
+                 }}
+              >
+                <img
+                  src={item.src}
+                  alt={item.alt}
+                  style={{
+                    ...itemStyles,
+                    objectFit: "cover",
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = "scale(1.1)";
+                    if (item.alt === "LeetCode") {
+                      setShowLeetCodeTooltip(true);
+                    } // Removed state toggling for Settings from here
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = "scale(1)";
+                    if (item.alt === "LeetCode") {
+                      setShowLeetCodeTooltip(false);
+                    } // Removed state toggling for Settings from here
+                  }}
+                  onClick={() => {
+                    if (item.alt === "Settings") {
+                      setShowLoginModal(true);
+                      setHasClickedSettings(true); // Set state on click
+                    } else if (item.alt === "LeetCode") {
+                      window.open('https://leetcode.com/problemset/', '_blank');
+                    }
+                  }}
+                />
+                 {/* LeetCode Tooltip */}
+                 {item.alt === "LeetCode" && showLeetCodeTooltip && (
+                    <div style={{
+                      position: 'absolute', // Position relative to the icon container
+                      bottom: 'calc(100% + 8px)', // Position above the icon with some space
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: '#fff', // White background
+                      color: '#000', // Black text
+                      padding: '8px 16px',
+                      borderRadius: '20px', // Pill shape
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      fontSize: '14px',
+                      whiteSpace: 'nowrap', // Prevent text wrapping
+                      zIndex: 10, // Ensure it's above other elements
+                      pointerEvents: 'none', // Allow clicking through the tooltip to the icon
+                    }}>
+                      open me
+                    </div>
+                 )}
+                 {/* Login Tooltip (for Settings icon) - Show permanently until clicked, then on hover */}
+                 {item.alt === "Settings" && (!hasClickedSettings || showLoginTooltip) && (
+                    <div style={{
+                      position: 'absolute', // Position relative to the icon container
+                      bottom: 'calc(100% + 8px)', // Position above the icon with some space
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: '#fff', // White background
+                      color: '#000', // Black text
+                      padding: '8px 16px',
+                      borderRadius: '20px', // Pill shape
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      fontSize: '14px',
+                      whiteSpace: 'nowrap', // Prevent text wrapping
+                      zIndex: 10, // Ensure it's above other elements
+                      pointerEvents: 'none', // Allow clicking through the tooltip to the icon
+                    }}>
+                       click me
+                    </div>
+                 )}
+              </div>
             );
           }
 
@@ -394,6 +615,63 @@ export default function Home() {
         </div>
       )}
 
+      {/* Daily Tasks Instructions Modal */}
+      {showInstructionsModal && (
+        <div
+          onClick={() => setShowInstructionsModal(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(0,0,0,0.18)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: darkMode ? "#232323" : "#fff",
+              borderRadius: "14px",
+              boxShadow: "0 4px 32px rgba(0,0,0,0.18)",
+              width: "400px", // Adjust width as needed
+              padding: "0 0 18px 0",
+              position: "relative",
+              display: "flex",
+              flexDirection: "column",
+              color: textColor,
+              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+            }}
+          >
+            {/* Mac window dots */}
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "12px 0 8px 14px" }}>
+              <div
+                onClick={() => setShowInstructionsModal(false)}
+                style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f56", border: "1.5px solid #e0443e", cursor: "pointer" }}
+                title="Close"
+              />
+              <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ffbd2e", border: "1.5px solid #dea123" }} title="Minimize" />
+              <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#27c93f", border: "1.5px solid #13a10e" }} title="Maximize" />
+            </div>
+            {/* Instructions Content */}
+            <div style={{ padding: "0 18px", fontSize: "15px", lineHeight: "1.6" }}>
+              <p style={{ margin: "0 0 10px 0", fontWeight: "normal" }}>Welcome to CS75HARD.</p>
+              <p style={{ margin: "0 0 10px 0" }}>By the end of these 75 days your hard work will pay off! To complete this challenge, the base case is to do:</p>
+              <ul style={{ margin: "0 0 10px 20px", padding: 0, listStyle: "disc" }}>
+                <li>3 leetcode problems a day</li>
+                <li>Apply to 1 internship a day</li>
+                <li>Work at least 1 hour on a personal project</li>
+              </ul>
+              <p style={{ margin: "0" }}>Show up daily. Log your effort. Build your future.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mac-style Sticky Note To-Do List (Always visible) */}
       <div
         style={{
@@ -415,7 +693,7 @@ export default function Home() {
         }}
         onMouseDown={handleMouseDown}
       >
-        <div style={{ fontWeight: 500, fontSize: 16, marginBottom: 10, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif', color: "#000" }}>
+        <div style={{ fontWeight: 400, fontSize: 16, marginBottom: 10, fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif', color: "#000" }}>
           To do:
         </div>
         {/* To-do list with checkboxes */}
@@ -523,7 +801,7 @@ export default function Home() {
             left: 0,
             width: "100vw",
             height: "100vh",
-            background: "rgba(0,0,0,0.6)",
+            background: "rgba(0,0,0,0.3)",
             zIndex: 1000,
             display: "flex",
             alignItems: "center",
@@ -534,30 +812,33 @@ export default function Home() {
             onClick={e => e.stopPropagation()}
             style={{
               background: darkMode ? '#333' : '#fff',
-              padding: '30px',
-              borderRadius: '8px',
-              boxShadow: '0 5px 15px rgba(0, 0, 0, 0.3)',
+              padding: '24px',
+              borderRadius: '12px',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
               textAlign: 'center',
-              maxWidth: '400px',
-              width: '100%',
+              width: '320px',
               position: 'relative',
               color: darkMode ? '#fff' : '#000',
+              backdropFilter: 'blur(8px)',
+              border: `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
             }}
           >
-            <h2>Sign Up or Sign In</h2>
+            <h2 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '500' }}>Sign In</h2>
             <input
               type="email"
               placeholder="Email"
               value={loginEmail}
               onChange={(e) => setLoginEmail(e.target.value)}
               style={{
-                margin: '10px 0',
+                margin: '8px 0',
                 padding: '10px',
                 width: '100%',
-                borderRadius: '4px',
+                borderRadius: '8px',
                 border: `1px solid ${darkMode ? '#555' : '#ccc'}`,
                 background: darkMode ? '#444' : '#fff',
                 color: darkMode ? '#fff' : '#000',
+                fontSize: '14px',
+                boxSizing: 'border-box',
               }}
             />
             <input
@@ -566,50 +847,80 @@ export default function Home() {
               value={loginPassword}
               onChange={(e) => setLoginPassword(e.target.value)}
               style={{
-                margin: '10px 0',
+                margin: '8px 0',
                 padding: '10px',
                 width: '100%',
-                borderRadius: '4px',
+                borderRadius: '8px',
                 border: `1px solid ${darkMode ? '#555' : '#ccc'}`,
                 background: darkMode ? '#444' : '#fff',
                 color: darkMode ? '#fff' : '#000',
+                fontSize: '14px',
+                boxSizing: 'border-box',
               }}
             />
-            <button
-              onClick={handleSignUp}
-              disabled={loginLoading}
-              style={{
-                margin: '10px 5px 10px 0',
-                padding: '10px 20px',
-                backgroundColor: '#0070f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                opacity: loginLoading ? 0.6 : 1
-              }}
-            >
-              {loginLoading ? 'Loading...' : 'Sign Up'}
-            </button>
-            <button
-              onClick={handleSignIn}
-              disabled={loginLoading}
-              style={{
-                margin: '10px 0 10px 5px',
-                padding: '10px 20px',
-                backgroundColor: '#0070f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                opacity: loginLoading ? 0.6 : 1
-              }}
-            >
-              {loginLoading ? 'Loading...' : 'Sign In'}
-            </button>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button
+                onClick={handleSignIn}
+                disabled={loginLoading}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  backgroundColor: '#0070f3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  opacity: loginLoading ? 0.6 : 1,
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                {loginLoading ? 'Loading...' : 'Sign In'}
+              </button>
+              <button
+                onClick={handleSignUp}
+                disabled={loginLoading}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  backgroundColor: 'transparent',
+                  color: darkMode ? '#fff' : '#000',
+                  border: `1px solid ${darkMode ? '#555' : '#ccc'}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  opacity: loginLoading ? 0.6 : 1,
+                  fontSize: '14px',
+                  fontWeight: '500',
+                }}
+              >
+                {loginLoading ? 'Loading...' : 'Sign Up'}
+              </button>
+            </div>
 
-            {loginError && <p style={{ color: 'red' }}>{loginError}</p>}
-            {loginMessage && <p style={{ color: 'green' }}>{loginMessage}</p>}
+            {loginError && (
+              <p style={{ 
+                color: '#ff4d4d', 
+                fontSize: '13px', 
+                margin: '12px 0 0 0',
+                padding: '8px',
+                background: darkMode ? 'rgba(255,77,77,0.1)' : 'rgba(255,77,77,0.05)',
+                borderRadius: '6px',
+              }}>
+                {loginError}
+              </p>
+            )}
+            {loginMessage && (
+              <p style={{ 
+                color: '#00c853', 
+                fontSize: '13px', 
+                margin: '12px 0 0 0',
+                padding: '8px',
+                background: darkMode ? 'rgba(0,200,83,0.1)' : 'rgba(0,200,83,0.05)',
+                borderRadius: '6px',
+              }}>
+                {loginMessage}
+              </p>
+            )}
           </div>
         </div>
       )}
