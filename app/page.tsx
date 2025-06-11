@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import React, { useState, useEffect } from "react";
+import Confetti from 'react-confetti';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GithubAuthProvider } from 'firebase/auth';
+import { auth } from '@/lib/firebaseConfig';
 
 export default function Home() {
   const [darkMode, setDarkMode] = useState(true);
@@ -45,6 +47,36 @@ export default function Home() {
   // State for activity data
   const [activityData, setActivityData] = useState<boolean[][]>([]);
 
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [confettiKey, setConfettiKey] = useState(0);
+
+  // Pomodoro Timer State
+  const POMODORO_DURATION = 25 * 60; // 25 minutes in seconds
+  const SHORT_BREAK_DURATION = 5 * 60; // 5 minutes in seconds
+  const LONG_BREAK_DURATION = 15 * 60; // 15 minutes in seconds
+
+  const [timeInSeconds, setTimeInSeconds] = useState(POMODORO_DURATION);
+  const [isActive, setIsActive] = useState(false);
+  const [currentPhase, setCurrentPhase] = useState('Pomodoro'); // 'Pomodoro', 'Short Break', 'Long Break'
+  const [pomodoroCount, setPomodoroCount] = useState(0);
+
+  const [leetcodeUsername, setLeetcodeUsername] = useState('');
+  const [leetcodeData, setLeetcodeData] = useState<{
+    totalSolved: number;
+    easySolved: number;
+    mediumSolved: number;
+    hardSolved: number;
+    recentSolved: string[];
+  } | null>(null);
+  const [isLoadingLeetcode, setIsLoadingLeetcode] = useState(false);
+  const [leetcodeError, setLeetcodeError] = useState<string | null>(null);
+
+  // Add LeetCode username input to the login modal
+  const [showLeetcodeInput, setShowLeetcodeInput] = useState(false);
+
+  // State for Journal content
+  const [journalContent, setJournalContent] = useState('');
+
   const backgroundColor = darkMode ? "#333" : "#fff";
   const lineColor = darkMode ? "#4b4a4a" : "#eee";
   const textColor = darkMode ? "#fff" : "#000";
@@ -73,6 +105,49 @@ export default function Home() {
     }
   }, []); // Empty dependency array means this runs once on mount
 
+  // Pomodoro Timer Effect
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isActive && timeInSeconds > 0) {
+      interval = setInterval(() => {
+        setTimeInSeconds(prevTime => prevTime - 1);
+      }, 1000);
+    } else if (isActive && timeInSeconds === 0) {
+      // Timer finished, switch phase
+      if (currentPhase === 'Pomodoro') {
+        setPomodoroCount(prevCount => prevCount + 1);
+        if ((pomodoroCount + 1) % 4 === 0) {
+          setCurrentPhase('Long Break');
+          setTimeInSeconds(LONG_BREAK_DURATION);
+        } else {
+          setCurrentPhase('Short Break');
+          setTimeInSeconds(SHORT_BREAK_DURATION);
+        }
+      } else {
+        // Break finished, go back to Pomodoro
+        setCurrentPhase('Pomodoro');
+        setTimeInSeconds(POMODORO_DURATION);
+      }
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isActive, timeInSeconds, currentPhase, pomodoroCount]);
+
+  const toggleTimer = () => {
+    setIsActive(!isActive);
+  };
+
+  const resetTimer = () => {
+    setIsActive(false);
+    setCurrentPhase('Pomodoro');
+    setTimeInSeconds(POMODORO_DURATION);
+    setPomodoroCount(0);
+  };
+
+  const minutes = Math.floor(timeInSeconds / 60);
+  const seconds = timeInSeconds % 60;
+
   const handleAddTask = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && newTaskText.trim() !== '') {
       e.preventDefault(); // Prevent newline in textarea
@@ -85,29 +160,14 @@ export default function Home() {
     setLoginLoading(true);
     setLoginError(null);
     setLoginMessage(null);
-    const { data, error } = await supabase.auth.signUp({
-      email: loginEmail,
-      password: loginPassword,
-    });
-    setLoginLoading(false);
-    if (error) {
-      setLoginError(error.message);
-    } else if (data.user) {
-       // Signup successful, now insert into 'users' table
-       const { data: insertData, error: insertError } = await supabase.from('users').insert([{ id: data.user.id }]);
-
-       if (insertError) {
-         console.error('Error inserting user into profile table:', insertError);
-         setLoginError('Sign up successful, but failed to create user profile.');
-         setLoginMessage(null);
-       } else {
-         setLoginMessage('Sign up successful! Please check your email to confirm.');
-         setLoginError(null); // Clear any previous errors
-       }
-    } else {
-      // This else block might be hit in unusual cases, keep existing message or refine
-      setLoginMessage('Sign up process started. Please check your email to confirm.');
-      setLoginError(null);
+    try {
+      await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
+      setLoginMessage('Sign up successful! Please check your email to confirm.');
+      setLoginError(null); // Clear any previous errors
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : 'Sign up failed. Please try again later.');
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -115,20 +175,16 @@ export default function Home() {
     setLoginLoading(true);
     setLoginError(null);
     setLoginMessage(null);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
-      password: loginPassword,
-    });
-    setLoginLoading(false);
-    if (error) {
-      setLoginError(error.message);
-    } else if (data.user) {
-       setLoginMessage('Sign in successful!');
-       // Close modal and potentially redirect on success
-       setShowLoginModal(false);
-       // window.location.href = '/'; // Uncomment/modify for redirection
-    } else {
-      setLoginError('Sign in failed. Please check your credentials.');
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      setLoginMessage('Sign in successful!');
+      // Close modal and potentially redirect on success
+      setShowLoginModal(false);
+      // window.location.href = '/'; // Uncomment/modify for redirection
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : 'Sign in failed. Please check your credentials.');
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -170,6 +226,31 @@ export default function Home() {
     // Calculate the offset from the mouse pointer to the top-left corner of the note
     const rect = e.currentTarget.getBoundingClientRect();
     setOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  };
+
+  // Function to fetch LeetCode data (no DB storage)
+  const fetchLeetcodeData = async (username: string) => {
+    setIsLoadingLeetcode(true);
+    setLeetcodeError(null);
+    try {
+      const response = await fetch('/api/leetcode', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch LeetCode data');
+      }
+      setLeetcodeData(data);
+      // No Supabase DB storage or upsert
+    } catch (error) {
+      setLeetcodeError(error instanceof Error ? error.message : 'Failed to fetch LeetCode data');
+    } finally {
+      setIsLoadingLeetcode(false);
+    }
   };
 
   return (
@@ -216,7 +297,7 @@ export default function Home() {
         }}
       >
         {[
-          { label: "Daily Tasks", icon: "/folder-icon.png" },
+          { label: "More Info", icon: "/folder-icon.png" },
           { label: "Journal", icon: "/folder-icon.png" },
           { label: "Leaderboard", icon: "/folder-icon.png" },
         ].map((folder, index) => (
@@ -231,7 +312,7 @@ export default function Home() {
               }}
               onClick={() => {
                 if (folder.label === "Journal") setShowJournal(true);
-                if (folder.label === "Daily Tasks") setShowInstructionsModal(true);
+                if (folder.label === "More Info") setShowInstructionsModal(true);
               }}
             />
             <p
@@ -494,6 +575,171 @@ export default function Home() {
         })}
       </div>
 
+      {/* Pomodoro Timer */}
+      <div
+        style={{
+          position: "absolute",
+          top: "100px",
+          right: "100px",
+          background: "#000", // Solid black background
+          borderRadius: "16px", // More rounded corners for the main container
+          boxShadow: "0 10px 30px rgba(0,0,0,0.5)", // Stronger, darker shadow
+          padding: "25px 30px", // Generous padding
+          color: textColor, // This will be mostly overridden by digit styles
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+          textAlign: "center",
+          width: "auto", // Let content define width
+          minWidth: "220px", // Smaller minimum width
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '4px', // Smaller gap between digit blocks
+          marginBottom: '15px', // Smaller space below the clock
+        }}>
+          {/* Minutes */}
+          {[String(minutes).padStart(2, '0')[0], String(minutes).padStart(2, '0')[1]].map((digit, i) => (
+            <div key={`min-${i}`}
+              style={{
+                background: '#222', // Dark background for the panels
+                borderRadius: '6px', // Slightly less rounded corners for individual panels
+                padding: '8px 4px', // Adjusted padding within each panel
+                width: '40px', // Fixed width for digits
+                height: '60px', // Fixed height for digits
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                position: 'relative',
+                overflow: 'hidden', // To hide the overflow for the "flip" effect
+                boxShadow: 'inset 0 0 4px rgba(0,0,0,0.5)', // Inner shadow for depth
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '48px', // Smaller font size for digits
+                  fontWeight: 700,
+                  color: '#e0e0e0', // Light grey for the digits
+                  lineHeight: 1, // Ensure text fits
+                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+                }}
+              >
+                {digit}
+              </span>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 0,
+                  right: 0,
+                  height: '1.5px', // Thinner horizontal line
+                  background: '#000', // Black line
+                  transform: 'translateY(-50%)',
+                }}
+              ></div>
+            </div>
+          ))}
+
+          {/* Colon Separator */}
+          <div
+            style={{
+              fontSize: '48px', // Smaller font size for digits
+              fontWeight: 700,
+              color: '#e0e0e0', // Light grey for the digits
+              lineHeight: 1,
+              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+              margin: '0 4px', // Smaller margin
+              alignSelf: 'center',
+            }}
+          >
+            :
+          </div>
+
+          {/* Seconds */}
+          {[String(seconds).padStart(2, '0')[0], String(seconds).padStart(2, '0')[1]].map((digit, i) => (
+            <div key={`sec-${i}`}
+              style={{
+                background: '#222', // Dark background for the panels
+                borderRadius: '6px', // Slightly less rounded corners for individual panels
+                padding: '8px 4px', // Adjusted padding within each panel
+                width: '40px', // Fixed width for digits
+                height: '60px', // Fixed height for digits
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                position: 'relative',
+                overflow: 'hidden', // To hide the overflow for the "flip" effect
+                boxShadow: 'inset 0 0 4px rgba(0,0,0,0.5)', // Inner shadow for depth
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '48px', // Smaller font size for digits
+                  fontWeight: 700,
+                  color: '#e0e0e0', // Light grey for the digits
+                  lineHeight: 1, // Ensure text fits
+                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+                }}
+              >
+                {digit}
+              </span>
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 0,
+                  right: 0,
+                  height: '1.5px', // Thinner horizontal line
+                  background: '#000', // Black line
+                  transform: 'translateY(-50%)',
+                }}
+              ></div>
+            </div>
+          ))}
+
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
+          <button
+            onClick={toggleTimer}
+            style={{
+              padding: "8px 16px", // Smaller padding for buttons
+              backgroundColor: "#5AC8FA", // CS75HARD title blue
+              color: "white",
+              border: "none",
+              borderRadius: "8px", // Slightly less rounded buttons
+              cursor: "pointer",
+              fontSize: "14px", // Smaller font size for buttons
+              fontWeight: 500,
+              transition: "background-color 0.2s ease",
+              flex: 1,
+            }}
+          >
+            {isActive ? 'Pause' : 'Start'}
+          </button>
+          <button
+            onClick={resetTimer}
+            style={{
+              padding: "8px 16px", // Smaller padding for buttons
+              backgroundColor: darkMode ? "#3a3a3a" : "#e0e0e0",
+              color: darkMode ? "#ccc" : "#333",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontSize: "14px", // Smaller font size for buttons
+              fontWeight: 500,
+              transition: "background-color 0.2s ease",
+              flex: 1,
+            }}
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
       {/* Google Fonts import for Inter */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&display=swap');
@@ -515,9 +761,10 @@ export default function Home() {
           position: "absolute",
           top: "50%",
           left: "50%",
-          transform: "translate(-50%, -50%)",
+          transform: "translate(-50%, -70%)",
           zIndex: 10,
           userSelect: "none",
+          textAlign: "center",
         }}
       >
         <span
@@ -553,6 +800,20 @@ export default function Home() {
             </span>
           ))}
         </span>
+        <p
+          style={{
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+            fontSize: "16px",
+            color: darkMode ? "#fff" : "#000",
+            marginTop: "8px",
+            maxWidth: "600px",
+            lineHeight: "1.5",
+          }}
+        >
+          CS75Hard is your personal 75-day coding challenge dashboard
+          <br />
+          No more 'I'll do it tomorrow'
+        </p>
       </div>
 
       {/* Journal Modal */}
@@ -596,9 +857,19 @@ export default function Home() {
               <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ffbd2e", border: "1.5px solid #dea123" }} title="Minimize" />
               <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#27c93f", border: "1.5px solid #13a10e" }} title="Maximize" />
             </div>
+            {/* Journal title and date */}
+            <div style={{ padding: "0 18px", marginBottom: "10px" }}>
+              <h3 style={{ margin: "0 0 5px 0", fontSize: "20px", fontWeight: 600, color: textColor }}>Daily Journal</h3>
+              <p style={{ margin: "0", fontSize: "13px", color: darkMode ? "#aaa" : "#666" }}>
+                {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+
             {/* Journal textarea */}
             <textarea
-              placeholder="Log your journal here..."
+              placeholder="Reflect on your coding journey, log your thoughts, and track your progress here..."
+              value={journalContent}
+              onChange={(e) => setJournalContent(e.target.value)}
               style={{
                 flex: 1,
                 margin: "0 18px",
@@ -609,8 +880,47 @@ export default function Home() {
                 color: textColor,
                 fontSize: "15px",
                 fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+                minHeight: "120px", // Ensure enough space
               }}
             />
+            {/* Character count */}
+            <p style={{ margin: "10px 18px 0", fontSize: "12px", color: darkMode ? "#888" : "#999", textAlign: "right" }}>
+              {journalContent.length} characters
+            </p>
+
+            {/* Save and Clear buttons */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "15px 18px 0" }}>
+              <button
+                onClick={() => { /* Implement save logic here, e.g., to local storage or Supabase */ alert('Journal Saved!'); setShowJournal(false);}}
+                style={{
+                  padding: "8px 15px",
+                  backgroundColor: "#5AC8FA", // CS75HARD blue
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setJournalContent('')}
+                style={{
+                  padding: "8px 15px",
+                  backgroundColor: darkMode ? "#3a3a3a" : "#e0e0e0",
+                  color: darkMode ? "#ccc" : "#333",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                }}
+              >
+                Clear
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -717,15 +1027,23 @@ export default function Home() {
               {/* Custom checkbox circle - now interactive */}
               <span
                 onClick={() => {
-                  setTasks(tasks.map((t, i) => i === index ? { ...t, completed: !t.completed } : t));
+                  const newTasks = tasks.map((t, i) => i === index ? { ...t, completed: !t.completed } : t);
+                  setTasks(newTasks);
+                  // Show confetti when task is completed (not when unchecked)
+                  if (!tasks[index].completed) {
+                    setShowConfetti(true);
+                    setConfettiKey(prev => prev + 1);
+                    // Hide confetti after 3 seconds
+                    setTimeout(() => setShowConfetti(false), 3000);
+                  }
                 }}
                 style={{
                   display: "inline-block",
-                  width: "16px", // Adjusted checkbox size slightly
-                  height: "16px", // Adjusted checkbox size slightly
+                  width: "16px",
+                  height: "16px",
                   border: "1.5px solid #000",
                   borderRadius: "50%",
-                  marginRight: "8px", // Adjusted margin after checkbox
+                  marginRight: "8px",
                   flexShrink: 0,
                   cursor: "pointer",
                   background: task.completed ? "#000" : "transparent",
@@ -790,6 +1108,18 @@ export default function Home() {
           zIndex: 5,
         }}
       />
+
+      {/* Add Confetti component */}
+      {showConfetti && (
+        <Confetti
+          key={confettiKey}
+          width={window.innerWidth}
+          height={window.innerHeight}
+          recycle={false}
+          numberOfPieces={200}
+          gravity={0.3}
+        />
+      )}
 
       {/* Login Modal */}
       {showLoginModal && (
@@ -920,6 +1250,107 @@ export default function Home() {
               }}>
                 {loginMessage}
               </p>
+            )}
+
+            {/* Add this inside the Login Modal, after the password input */}
+            {showLeetcodeInput && (
+              <div style={{ marginTop: '16px' }}>
+                <input
+                  type="text"
+                  placeholder="LeetCode Username"
+                  value={leetcodeUsername}
+                  onChange={(e) => setLeetcodeUsername(e.target.value)}
+                  style={{
+                    margin: '8px 0',
+                    padding: '10px',
+                    width: '100%',
+                    borderRadius: '8px',
+                    border: `1px solid ${darkMode ? '#555' : '#ccc'}`,
+                    background: darkMode ? '#444' : '#fff',
+                    color: darkMode ? '#fff' : '#000',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <button
+                  onClick={() => fetchLeetcodeData(leetcodeUsername)}
+                  disabled={isLoadingLeetcode || !leetcodeUsername}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    backgroundColor: '#0070f3',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    opacity: (isLoadingLeetcode || !leetcodeUsername) ? 0.6 : 1,
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    marginTop: '8px',
+                  }}
+                >
+                  {isLoadingLeetcode ? 'Loading...' : 'Connect LeetCode'}
+                </button>
+                {leetcodeError && (
+                  <p style={{ 
+                    color: '#ff4d4d', 
+                    fontSize: '13px', 
+                    margin: '8px 0 0 0',
+                    padding: '8px',
+                    background: darkMode ? 'rgba(255,77,77,0.1)' : 'rgba(255,77,77,0.05)',
+                    borderRadius: '6px',
+                  }}>
+                    {leetcodeError}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Add a button to show LeetCode input */}
+            <button
+              onClick={() => setShowLeetcodeInput(!showLeetcodeInput)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                backgroundColor: 'transparent',
+                color: darkMode ? '#fff' : '#000',
+                border: `1px solid ${darkMode ? '#555' : '#ccc'}`,
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                marginTop: '8px',
+              }}
+            >
+              {showLeetcodeInput ? 'Hide LeetCode Integration' : 'Add LeetCode Integration'}
+            </button>
+
+            {/* Add LeetCode stats display */}
+            {leetcodeData && (
+              <div style={{
+                marginTop: '16px',
+                padding: '16px',
+                background: darkMode ? '#444' : '#f5f5f5',
+                borderRadius: '8px',
+              }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px' }}>LeetCode Progress</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                  <div>Total Solved: {leetcodeData.totalSolved}</div>
+                  <div>Easy: {leetcodeData.easySolved}</div>
+                  <div>Medium: {leetcodeData.mediumSolved}</div>
+                  <div>Hard: {leetcodeData.hardSolved}</div>
+                </div>
+                {leetcodeData.recentSolved.length > 0 && (
+                  <div style={{ marginTop: '12px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '14px' }}>Recently Solved:</h4>
+                    <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: '13px' }}>
+                      {leetcodeData.recentSolved.slice(0, 5).map((problem, index) => (
+                        <li key={index}>{problem}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
