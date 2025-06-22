@@ -7,6 +7,7 @@ import HeroSection from '../components/WelcomeScreen/HeroSection';
 import ValueCards from '../components/WelcomeScreen/ValueCards';
 import HowItWorks from '../components/WelcomeScreen/HowItWorks';
 import SocialProof from '../components/WelcomeScreen/SocialProof';
+import Image from 'next/image';
 
 const WelcomePage: React.FC = () => {
   const router = useRouter();
@@ -30,7 +31,7 @@ const WelcomePage: React.FC = () => {
       }, index * 100) // Staggered fade-in with 100ms delay
     );
     return () => timers.forEach(timer => clearTimeout(timer));
-  }, []);
+  }, [sectionsVisible]);
 
   const handleStartChallenge = () => {
     router.push('/'); // Navigate to the main dashboard
@@ -149,13 +150,15 @@ const WelcomePage: React.FC = () => {
           if (item.type === 'icon') {
             itemElement = (
               <div style={{ position: 'relative' }}>
-                <img
+                <Image
                   src={item.src}
                   alt={item.alt}
                   style={{
                     ...itemStyles,
                     objectFit: "cover",
                   }}
+                  width={50}
+                  height={50}
                   onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.1)"; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
                   onClick={() => {

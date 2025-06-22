@@ -1,5 +1,24 @@
 import { NextResponse } from 'next/server';
 
+interface LeetCodeSubmission {
+  difficulty: string;
+  count: number;
+  submissions: number;
+}
+
+interface LeetCodeUserData {
+  submitStatsGlobal: {
+    acSubmissionNum: LeetCodeSubmission[];
+  };
+}
+
+interface LeetCodeResponse {
+  data: {
+    matchedUser: LeetCodeUserData | null;
+  };
+  errors?: Array<{ message: string }>;
+}
+
 export async function POST(request: Request) {
   try {
     const { username } = await request.json();
@@ -33,7 +52,7 @@ export async function POST(request: Request) {
       }),
     });
 
-    const data = await response.json();
+    const data: LeetCodeResponse = await response.json();
 
     if (data.errors) {
       return NextResponse.json({ error: data.errors[0].message }, { status: 400 });
@@ -48,10 +67,10 @@ export async function POST(request: Request) {
     const recentSolved: string[] = [];
 
     const processedData = {
-      totalSolved: stats.find((s: any) => s.difficulty === 'All')?.count || 0,
-      easySolved: stats.find((s: any) => s.difficulty === 'Easy')?.count || 0,
-      mediumSolved: stats.find((s: any) => s.difficulty === 'Medium')?.count || 0,
-      hardSolved: stats.find((s: any) => s.difficulty === 'Hard')?.count || 0,
+      totalSolved: stats.find((s: LeetCodeSubmission) => s.difficulty === 'All')?.count || 0,
+      easySolved: stats.find((s: LeetCodeSubmission) => s.difficulty === 'Easy')?.count || 0,
+      mediumSolved: stats.find((s: LeetCodeSubmission) => s.difficulty === 'Medium')?.count || 0,
+      hardSolved: stats.find((s: LeetCodeSubmission) => s.difficulty === 'Hard')?.count || 0,
       recentSolved,
     };
 

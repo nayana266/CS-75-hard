@@ -1,50 +1,57 @@
-import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
-import { db } from './firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firestore';
 import { User } from 'firebase/auth';
 
-// Call this when a user completes a daily challenge
-export async function updateUserStats(user: User, pointsForTask = 1) {
-  if (!user) return;
-  const userRef = doc(db, 'users', user.uid);
-  const userSnap = await getDoc(userRef);
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10); // YYYY-MM-DD
-
-  let currentStreak = 1;
-  let longestStreak = 1;
-  let totalPoints = pointsForTask;
-  let lastCompletedDate = todayStr;
-  let displayName = user.displayName || user.email || 'Anonymous';
-
-  if (userSnap.exists()) {
-    const data = userSnap.data();
-    totalPoints = (data.totalPoints || 0) + pointsForTask;
-    displayName = data.displayName || displayName;
-    lastCompletedDate = data.lastCompletedDate || '';
-    longestStreak = data.longestStreak || 1;
-    // Streak logic
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
-    if (data.lastCompletedDate === todayStr) {
-      // Already completed today, don't increment streak
-      currentStreak = data.currentStreak || 1;
-    } else if (data.lastCompletedDate === yesterdayStr) {
-      // Consecutive day
-      currentStreak = (data.currentStreak || 1) + 1;
+export const updateUserStats = async (user: User, tasksCompleted: number) => {
+  try {
+    const userRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      const today = new Date().toISOString().split('T')[0];
+      const lastCompleted = userData.lastCompletedDate;
+      
+      let newStreak = userData.currentStreak || 0;
+      let newLongestStreak = userData.longestStreak || 0;
+      
+      if (lastCompleted === today) {
+        // Already completed today, just update points
+        newStreak = userData.currentStreak || 0;
+      } else if (lastCompleted === new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]) {
+        // Completed yesterday, continue streak
+        newStreak = (userData.currentStreak || 0) + 1;
+      } else {
+        // Break in streak, start new streak
+        newStreak = 1;
+      }
+      
+      // Update longest streak if current streak is longer
+      if (newStreak > newLongestStreak) {
+        newLongestStreak = newStreak;
+      }
+      
+      await setDoc(userRef, {
+        currentStreak: newStreak,
+        longestStreak: newLongestStreak,
+        totalPoints: (userData.totalPoints || 0) + (tasksCompleted * 10),
+        totalTasksCompleted: (userData.totalTasksCompleted || 0) + tasksCompleted,
+        lastCompletedDate: today,
+      }, { merge: true });
     } else {
-      // Missed a day
-      currentStreak = 1;
+      // Create new user document
+      await setDoc(userRef, {
+        currentStreak: 1,
+        longestStreak: 1,
+        totalPoints: tasksCompleted * 10,
+        totalTasksCompleted: tasksCompleted,
+        lastCompletedDate: new Date().toISOString().split('T')[0],
+        displayName: user.displayName || user.email,
+        email: user.email,
+        createdAt: new Date().toISOString(),
+      });
     }
-    if (currentStreak > longestStreak) longestStreak = currentStreak;
+  } catch (error) {
+    console.error('Error updating user stats:', error);
   }
-
-  await setDoc(userRef, {
-    displayName,
-    currentStreak,
-    longestStreak,
-    totalPoints,
-    lastCompletedDate: todayStr,
-    avatarUrl: user.photoURL || '',
-  }, { merge: true });
-} 
+}; 
