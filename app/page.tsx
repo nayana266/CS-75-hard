@@ -738,15 +738,15 @@ export default function Home() {
         />
       </div>
 
-      <img
+      <Image
         src="/trash.png"
         alt="Trash"
+        width={64}
+        height={64}
         style={{
           position: "absolute",
           bottom: "40px",
           right: "20px",
-          width: "64px",
-          height: "64px",
           cursor: "pointer",
           zIndex: 5,
         }}
