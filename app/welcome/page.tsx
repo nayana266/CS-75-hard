@@ -4,9 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import MenuBar from '../components/MenuBar';
 import HeroSection from '../components/WelcomeScreen/HeroSection';
-import ValueCards from '../components/WelcomeScreen/ValueCards';
-import HowItWorks from '../components/WelcomeScreen/HowItWorks';
-import SocialProof from '../components/WelcomeScreen/SocialProof';
 
 const WelcomePage: React.FC = () => {
   const router = useRouter();
@@ -98,9 +95,6 @@ const WelcomePage: React.FC = () => {
           onLogin={handleLogin}
           style={{ marginBottom: '20px' }}
         />
-        <ValueCards darkMode={darkMode} style={{ marginBottom: '20px' }} />
-        <HowItWorks darkMode={darkMode} style={{ marginBottom: '20px' }} />
-        <SocialProof darkMode={darkMode} style={{ marginBottom: '0px' }} />
       </div>
 
       {/* macOS-style Dock */}

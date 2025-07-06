@@ -31,11 +31,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ darkMode, onStartChallenge, o
       <span
         className={cs75Hover ? "cs75hard-hover" : ""}
         style={{
-          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
           fontWeight: 800,
-          fontSize: "48px",
-          letterSpacing: "0.06em", // Keep the letter spacing from old design
-          color: textColorPrimary,
+          fontSize: "64px",
+          letterSpacing: "0.01em",
+          color: cs75Hover ? '#fff' : '#5AC8FA',
           transition: "color 0.18s",
           cursor: "pointer",
           display: "inline-block",
@@ -49,11 +49,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ darkMode, onStartChallenge, o
             className="cs75hard-letter"
             style={cs75Hover ? {
               transform: `translateY(-10px) scale(1.15)`,
-              color: blueHoverColor, // Blue hover color
+              color: textColorPrimary, // Blue hover color
               transitionDelay: `${i * 40}ms`,
             } : {
               transform: "none",
-              color: textColorPrimary,
+              color: blueHoverColor,
               transitionDelay: `${i * 40}ms`,
             }}
           >
@@ -74,16 +74,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ darkMode, onStartChallenge, o
         CS75Hard is your personal 75-day coding challenge dashboard<br />
         No more 'I'll do it tomorrow'
       </p>
-
-      {/* CTA Buttons */}
-      <div className="flex flex-col md:flex-row gap-4 mt-6">
-        <button onClick={onStartChallenge} className="btn-primary">
-          Start Your Challenge
-        </button>
-        <button onClick={onLogin} className="btn-secondary">
-          Log in
-        </button>
-      </div>
     </section>
   );
 };
