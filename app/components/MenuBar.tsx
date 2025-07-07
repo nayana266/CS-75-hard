@@ -45,7 +45,7 @@ const MenuBar: React.FC<MenuBarProps> = ({ darkMode }) => {
         padding: '0 10px',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
         fontSize: '12px',
-        color: darkMode ? '#f0f0f0' : '#333', // Change text color based on dark mode
+        color: darkMode ? '#ffffff' : '#333', // Use pure white in dark mode
         fontWeight: '500',
         boxSizing: 'border-box',
       }}

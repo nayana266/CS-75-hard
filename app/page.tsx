@@ -128,6 +128,13 @@ export default function Home() {
     }
   }, []); // Empty dependency array means this runs once on mount
 
+  useEffect(() => {
+    const storedMode = localStorage.getItem('darkMode');
+    if (storedMode !== null) {
+      setDarkMode(storedMode === 'true');
+    }
+  }, []);
+
   const handleAddTask = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && newTaskText.trim() !== '') {
       e.preventDefault(); // Prevent newline in textarea
@@ -519,7 +526,7 @@ export default function Home() {
                {week.map((isCompleted, dayIndex) => {
                  const color = isCompleted 
                                ? '#5AC8FA' // Use the CS75HARD hover blue
-                               : (darkMode ? '#1b1b1b' : '#ebedef'); // Grey for incomplete
+                               : (darkMode ? '#1b1b1b' : '#d3d6db'); // Light grey for incomplete in light mode
 
                  return (
                    <div 
@@ -1007,140 +1014,6 @@ export default function Home() {
           numberOfPieces={200}
           gravity={0.3}
         />
-      )}
-
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div
-          onClick={() => setShowLoginModal(false)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            background: "rgba(0,0,0,0.3)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: darkMode ? '#333' : '#fff',
-              padding: '24px',
-              borderRadius: '12px',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-              textAlign: 'center',
-              width: '320px',
-              position: 'relative',
-              color: darkMode ? '#fff' : '#000',
-              backdropFilter: 'blur(8px)',
-              border: `1px solid ${darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-            }}
-          >
-            <h2 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '500' }}>Sign In</h2>
-            <input
-              type="email"
-              placeholder="Email"
-              value={loginEmail}
-              onChange={(e) => setLoginEmail(e.target.value)}
-              style={{
-                margin: '8px 0',
-                padding: '10px',
-                width: '100%',
-                borderRadius: '8px',
-                border: `1px solid ${darkMode ? '#555' : '#ccc'}`,
-                background: darkMode ? '#444' : '#fff',
-                color: darkMode ? '#fff' : '#000',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-              }}
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
-              style={{
-                margin: '8px 0',
-                padding: '10px',
-                width: '100%',
-                borderRadius: '8px',
-                border: `1px solid ${darkMode ? '#555' : '#ccc'}`,
-                background: darkMode ? '#444' : '#fff',
-                color: darkMode ? '#fff' : '#000',
-                fontSize: '14px',
-                boxSizing: 'border-box',
-              }}
-            />
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-              <button
-                onClick={handleSignIn}
-                disabled={loginLoading}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  backgroundColor: '#0070f3',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  opacity: loginLoading ? 0.6 : 1,
-                  fontSize: '14px',
-                  fontWeight: '500',
-                }}
-              >
-                {loginLoading ? 'Loading...' : 'Sign In'}
-              </button>
-              <button
-                onClick={handleSignUp}
-                disabled={loginLoading}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  backgroundColor: 'transparent',
-                  color: darkMode ? '#fff' : '#000',
-                  border: `1px solid ${darkMode ? '#555' : '#ccc'}`,
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  opacity: loginLoading ? 0.6 : 1,
-                  fontSize: '14px',
-                  fontWeight: '500',
-                }}
-              >
-                {loginLoading ? 'Loading...' : 'Sign Up'}
-              </button>
-            </div>
-
-            {loginError && hasTriedAuth && (
-              <p style={{ 
-                color: '#ff4d4d', 
-                fontSize: '13px', 
-                margin: '12px 0 0 0',
-                padding: '8px',
-                background: darkMode ? 'rgba(255,77,77,0.1)' : 'rgba(255,77,77,0.05)',
-                borderRadius: '6px',
-              }}>
-                {loginError}
-              </p>
-            )}
-            {loginMessage && (
-              <p style={{ 
-                color: '#00c853', 
-                fontSize: '13px', 
-                margin: '12px 0 0 0',
-                padding: '8px',
-                background: darkMode ? 'rgba(0,200,83,0.1)' : 'rgba(0,200,83,0.05)',
-                borderRadius: '6px',
-              }}>
-                {loginMessage}
-              </p>
-            )}
-          </div>
-        </div>
       )}
 
       {/* Leaderboard Modal */}

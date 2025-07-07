@@ -16,6 +16,11 @@ const WelcomePage: React.FC = () => {
   const textColorPrimary = darkMode ? 'var(--color-text-primary-dark)' : 'var(--color-text-primary-light)';
 
   useEffect(() => {
+    // On mount, read darkMode from localStorage
+    const storedMode = localStorage.getItem('darkMode');
+    if (storedMode !== null) {
+      setDarkMode(storedMode === 'true');
+    }
     // Trigger fade-in for each section sequentially
     const timers = sectionsVisible.map((_, index) =>
       setTimeout(() => {
@@ -60,7 +65,12 @@ const WelcomePage: React.FC = () => {
 
       {/* Subtle toggle button in top-left corner */}
       <button
-        onClick={() => setDarkMode(!darkMode)}
+        onClick={() => {
+          setDarkMode(dm => {
+            localStorage.setItem('darkMode', String(!dm));
+            return !dm;
+          });
+        }}
         style={{
           position: "absolute",
           top: "35px",

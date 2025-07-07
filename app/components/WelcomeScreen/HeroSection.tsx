@@ -1,4 +1,7 @@
 import React from 'react';
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
+import { LoginForm } from '@/components/login-form';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 interface HeroSectionProps {
   darkMode: boolean;
@@ -74,6 +77,33 @@ const HeroSection: React.FC<HeroSectionProps> = ({ darkMode, onStartChallenge, o
         CS75Hard is your personal 75-day coding challenge dashboard<br />
         No more 'I'll do it tomorrow'
       </p>
+      <Dialog>
+        <DialogTrigger asChild>
+          <button
+            className="btn-primary"
+            style={{
+              marginTop: 24,
+              padding: '16px 48px',
+              fontSize: '20px',
+              fontWeight: 600,
+              borderRadius: '32px',
+              background: '#5AC8FA',
+              color: '#fff',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background 0.18s',
+            }}
+          >
+            Log in
+          </button>
+        </DialogTrigger>
+        <DialogContent>
+          <VisuallyHidden>
+            <DialogTitle>Log in to your account</DialogTitle>
+          </VisuallyHidden>
+          <LoginForm />
+        </DialogContent>
+      </Dialog>
     </section>
   );
 };
