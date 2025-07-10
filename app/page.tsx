@@ -32,31 +32,31 @@ export default function Home() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loginMessage, setLoginMessage] = useState<string | null>(null);
-  const [hasTriedAuth, setHasTriedAuth] = useState(false);
 
-  // State for LeetCode tooltip
-  const [showLeetCodeTooltip, setShowLeetCodeTooltip] = useState(false);
-
-  // State for Login tooltip
-  const [showLoginTooltip, setShowLoginTooltip] = useState(false);
-
-  // New state to track if settings icon has been clicked
-  const [hasClickedSettings, setHasClickedSettings] = useState(false);
 
   // Effect to reset login error and tried auth state when modal opens
   useEffect(() => {
     if (showLoginModal) {
-      setLoginError(null);
-      setHasTriedAuth(false);
+      // setLoginError(null); // Removed
+      // setHasTriedAuth(false); // Removed
+    }
+  }, [showLoginModal]);
+
+
+
+
+
+
+  // Effect to reset login error and tried auth state when modal opens
+  useEffect(() => {
+    if (showLoginModal) {
+      // setLoginError(null); // Removed
+      // setHasTriedAuth(false); // Removed
     }
   }, [showLoginModal]);
 
   // State for activity data
   const [completedDays, setCompletedDays] = useState<Record<string, boolean>>({});
-  const [lostStreaks, setLostStreaks] = useState(0);
   const [showTrashPopup, setShowTrashPopup] = useState(false);
 
   const [showConfetti, setShowConfetti] = useState(false);
@@ -74,8 +74,7 @@ export default function Home() {
   const [isLoadingLeetcode, setIsLoadingLeetcode] = useState(false);
   const [leetcodeError, setLeetcodeError] = useState<string | null>(null);
 
-  // Add LeetCode username input to the login modal
-  const [showLeetcodeInput, setShowLeetcodeInput] = useState(false);
+
 
   // State for Journal content
   const [journalContent, setJournalContent] = useState('');
@@ -145,42 +144,8 @@ export default function Home() {
     setTasks(tasksByLevel[level]);
   };
 
-  // Update handleSignUp to show onboarding modal
-  const handleSignUp = async () => {
-    setLoginLoading(true);
-    setLoginError(null);
-    setLoginMessage(null);
-    setHasTriedAuth(true);
-    try {
-      await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-      setLoginMessage('Sign up successful!');
-      setLoginError(null);
-      setShowLoginModal(false);
-      setShowOnboardingModal(true); // Show onboarding after successful signup
-    } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'Sign up failed. Please try again later.');
-    } finally {
-      setLoginLoading(false);
-    }
-  };
 
-  const handleSignIn = async () => {
-    setLoginLoading(true);
-    setLoginError(null);
-    setLoginMessage(null);
-    setHasTriedAuth(true);
-    try {
-      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
-      setLoginMessage('Sign in successful!');
-      // Close modal and potentially redirect on success
-      setShowLoginModal(false);
-      // window.location.href = '/'; // Uncomment/modify for redirection
-    } catch (error) {
-      setLoginError(error instanceof Error ? error.message : 'Sign in failed. Please check your credentials.');
-    } finally {
-      setLoginLoading(false);
-    }
-  };
+
 
   // Add event listeners for dragging
   React.useEffect(() => {
@@ -353,10 +318,10 @@ export default function Home() {
       setShowOnboardingModal(false);
       
       // Show success message
-      setLoginMessage('Welcome to CS75HARD! Your goals have been set.');
+      // setLoginMessage('Welcome to CS75HARD! Your goals have been set.'); // Removed
     } catch (error) {
       console.error('Error saving user level:', error);
-      setLoginError('Failed to save your preferences. Please try again.');
+      // setLoginError('Failed to save your preferences. Please try again.'); // Removed
     }
   };
 
@@ -576,7 +541,6 @@ export default function Home() {
                   if (item.alt === "Settings") {
                     if (!auth.currentUser) {
                       setShowLoginModal(true);
-                      setHasClickedSettings(true);
                     } else {
                       // setShowSettingsMenu(true); // This line was removed
                     }
@@ -596,7 +560,7 @@ export default function Home() {
                   }}
                 />
                 {/* LeetCode Tooltip */}
-                {item.alt === "LeetCode" && showLeetCodeTooltip && (
+                {item.alt === "LeetCode" && (
                   <div style={{
                     position: 'absolute',
                     bottom: 'calc(100% + 8px)',
@@ -936,7 +900,7 @@ export default function Home() {
             textAlign: 'center',
           }}
         >
-          <div style={{ marginBottom: 8 }}>Streaks lost: <b>{lostStreaks}</b></div>
+          <div style={{ marginBottom: 8 }}>Streaks lost: <b>0</b></div>
           <button
             style={{
               background: '#5AC8FA',
