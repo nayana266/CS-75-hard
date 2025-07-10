@@ -5,7 +5,7 @@ import Confetti from 'react-confetti';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { updateUserStats } from '@/lib/firestoreHelpers';
-import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firestore';
 import MenuBar from './components/MenuBar';
 
@@ -549,7 +549,7 @@ export default function Home() {
           { type: 'icon', src: "/leetcode.png", alt: "LeetCode" },
           { type: 'icon', src: "/githubdark.png", alt: "GitHub" },
           { type: 'icon', src: "/briefcase.png", alt: "Internship", onClick: () => setShowInternshipModal(true) },
-        ].map((item, idx, arr) => {
+        ].map((item, idx) => {
           // Styles for both icons and colored blocks
           const itemStyles = {
             width: "50px",
