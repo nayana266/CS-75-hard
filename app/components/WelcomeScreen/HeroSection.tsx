@@ -15,7 +15,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ darkMode, onStartChallenge, o
 
   // Define colors based on dark mode for inline styles if needed, though CSS vars are preferred
   const textColorPrimary = darkMode ? 'var(--color-text-primary-dark)' : 'var(--color-text-primary-light)';
-  const textColorSecondary = 'var(--color-text-secondary)'; // This will no longer be directly used for the combined text, but kept for clarity.
   const blueHoverColor = '#5AC8FA'; // CS75HARD blue from previous implementation
 
   return (
@@ -75,7 +74,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ darkMode, onStartChallenge, o
         }}
       >
         CS75Hard is your personal 75-day coding challenge dashboard<br />
-        No more 'I'll do it tomorrow'
+        No more &apos;I&apos;ll do it tomorrow&apos;
       </p>
       <Dialog>
         <DialogTrigger asChild>

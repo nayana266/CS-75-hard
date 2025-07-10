@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firestore';
 import { User } from 'firebase/auth';
 
@@ -13,15 +13,12 @@ export async function updateUserStats(user: User, pointsForTask = 1) {
   let currentStreak = 1;
   let longestStreak = 1;
   let totalPoints = pointsForTask;
-  let lastCompletedDate = todayStr;
   let displayName = user.displayName || user.email || 'Anonymous';
 
   if (userSnap.exists()) {
     const data = userSnap.data();
     totalPoints = (data.totalPoints || 0) + pointsForTask;
     displayName = data.displayName || displayName;
-    lastCompletedDate = data.lastCompletedDate || '';
-    longestStreak = data.longestStreak || 1;
     // Streak logic
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);

@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     }
 
     // Extract application data
-    const { userId, companyName, position, status } = data;
+    const { userId, companyName, position } = data;
 
     if (!userId || !companyName || !position) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });

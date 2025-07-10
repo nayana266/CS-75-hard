@@ -33,8 +33,8 @@ export function LoginForm({
     try {
       await signInWithEmailAndPassword(auth, email, password)
       router.push('/')
-    } catch (err: any) {
-      setError(err.message || 'Login failed')
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -47,8 +47,8 @@ export function LoginForm({
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       router.push('/');
-    } catch (err: any) {
-      setError(err.message || 'Google sign-in failed');
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || 'Google sign-in failed');
     } finally {
       setLoading(false);
     }
