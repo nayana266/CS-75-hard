@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import Confetti from 'react-confetti';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { updateUserStats } from '@/lib/firestoreHelpers';
 import { collection, getDocs, query, orderBy, limit, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -30,8 +29,6 @@ export default function Home() {
 
   // State and handlers for Login Modal
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
 
 
   // Effect to reset login error and tried auth state when modal opens
@@ -389,7 +386,7 @@ export default function Home() {
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
         if (data && Array.isArray(data.tasks)) {
-          completed[docSnap.id] = data.tasks.length > 0 && data.tasks.every((t: any) => t.completed);
+          completed[docSnap.id] = data.tasks.length > 0 && data.tasks.every((t: unknown) => (t as { completed: boolean }).completed);
         }
       });
       setCompletedDays(completed);
@@ -514,7 +511,7 @@ export default function Home() {
           { type: 'icon', src: "/leetcode.png", alt: "LeetCode" },
           { type: 'icon', src: "/githubdark.png", alt: "GitHub" },
           { type: 'icon', src: "/briefcase.png", alt: "Internship", onClick: () => setShowInternshipModal(true) },
-        ].map((item, idx) => {
+        ].map((item) => {
           // Styles for both icons and colored blocks
           const itemStyles = {
             width: "50px",
