@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Confetti from 'react-confetti';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GithubAuthProvider } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { updateUserStats } from '@/lib/firestoreHelpers';
 import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
@@ -11,10 +11,8 @@ import MenuBar from './components/MenuBar';
 
 export default function Home() {
   const [darkMode, setDarkMode] = useState(true);
-  const [hoveredApp, setHoveredApp] = useState<number | null>(null);
   const [showJournal, setShowJournal] = useState(false);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
-  const [currentDay, setCurrentDay] = useState(54);
   const [tasks, setTasks] = useState<{
     text: string;
     completed: boolean;
@@ -32,7 +30,6 @@ export default function Home() {
 
   // State and handlers for Login Modal
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
@@ -58,7 +55,6 @@ export default function Home() {
   }, [showLoginModal]);
 
   // State for activity data
-  const [activityData, setActivityData] = useState<boolean[][]>([]);
   const [completedDays, setCompletedDays] = useState<Record<string, boolean>>({});
   const [lostStreaks, setLostStreaks] = useState(0);
   const [showTrashPopup, setShowTrashPopup] = useState(false);
@@ -103,7 +99,6 @@ export default function Home() {
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<'beginner' | 'intermediate' | 'advanced' | null>(null);
 
-  const [streak, setStreak] = useState(1);
   const [dayCount, setDayCount] = useState(1);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -380,7 +375,6 @@ export default function Home() {
     const unsub = onSnapshot(metaRef, (docSnap) => {
       const data = docSnap.data();
       if (data) {
-        setStreak(data.currentStreak || 1);
         // Day count = streak or a separate field, fallback to streak
         setDayCount(data.currentStreak || 1);
       }
@@ -584,7 +578,7 @@ export default function Home() {
                       setShowLoginModal(true);
                       setHasClickedSettings(true);
                     } else {
-                      setShowSettingsMenu(true);
+                      // setShowSettingsMenu(true); // This line was removed
                     }
                   } else if (item.alt === "LeetCode") {
                     setShowLeetcodeModal(true);
@@ -1567,7 +1561,7 @@ export default function Home() {
                 const dateStr = day.toISOString().slice(0, 10);
                 days.push(!!completedDays[dateStr]);
               }
-              let resetIdx = days.findIndex((d, i) => i > 0 && !d && days[i-1]);
+              const resetIdx = days.findIndex((d, i) => i > 0 && !d && days[i-1]);
               if (resetIdx !== -1) {
                 for (let i = resetIdx; i < days.length; i++) days[i] = false;
               }
@@ -1588,7 +1582,7 @@ export default function Home() {
                 const dateStr = day.toISOString().slice(0, 10);
                 days.push(!!completedDays[dateStr]);
               }
-              let resetIdx = days.findIndex((d, i) => i > 0 && !d && days[i-1]);
+              const resetIdx = days.findIndex((d, i) => i > 0 && !d && days[i-1]);
               if (resetIdx !== -1) {
                 for (let i = resetIdx; i < days.length; i++) days[i] = false;
               }
@@ -1632,7 +1626,7 @@ export default function Home() {
                 days.push(!!completedDays[dateStr]);
               }
               // If a user misses a day, reset the grid
-              let resetIdx = days.findIndex((d, i) => i > 0 && !d && days[i-1]);
+              const resetIdx = days.findIndex((d, i) => i > 0 && !d && days[i-1]);
               if (resetIdx !== -1) {
                 for (let i = resetIdx; i < days.length; i++) days[i] = false;
               }
@@ -1645,7 +1639,7 @@ export default function Home() {
                 for (let col = 0; col < 15; col++) {
                   const idx = row + col * 5;
                   if (idx < 75) {
-                    let style = {
+                    const style = {
                       width: '16px',
                       height: '16px',
                       background: (idx < nextIdx) ? '#5AC8FA' : (darkMode ? '#1b1b1b' : '#d3d6db'),
