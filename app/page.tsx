@@ -5,7 +5,7 @@ import Confetti from 'react-confetti';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GithubAuthProvider } from 'firebase/auth';
 import { auth } from '@/lib/firebaseConfig';
 import { updateUserStats } from '@/lib/firestoreHelpers';
-import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, getDoc, updateDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firestore';
 import MenuBar from './components/MenuBar';
 
@@ -59,6 +59,9 @@ export default function Home() {
 
   // State for activity data
   const [activityData, setActivityData] = useState<boolean[][]>([]);
+  const [completedDays, setCompletedDays] = useState<Record<string, boolean>>({});
+  const [lostStreaks, setLostStreaks] = useState(0);
+  const [showTrashPopup, setShowTrashPopup] = useState(false);
 
   const [showConfetti, setShowConfetti] = useState(false);
   const [confettiKey, setConfettiKey] = useState(0);
@@ -100,33 +103,15 @@ export default function Home() {
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<'beginner' | 'intermediate' | 'advanced' | null>(null);
 
+  const [streak, setStreak] = useState(1);
+  const [dayCount, setDayCount] = useState(1);
+  const [userId, setUserId] = useState<string | null>(null);
+
   const backgroundColor = darkMode ? "#333" : "#fff";
   const lineColor = darkMode ? "#4b4a4a" : "#eee";
   const textColor = darkMode ? "#fff" : "#000";
 
-  // Generate activity data on the client side after mount
-  React.useEffect(() => {
-    const generateActivityData = () => {
-      const data: boolean[][] = [];
-      // Generate data for approx. 53 weeks
-      for (let i = 0; i < 53; i++) {
-        const week: boolean[] = [];
-        // Generate data for 7 days a week
-        for (let j = 0; j < 7; j++) {
-          // Mock data for coloring - replace with real logic later
-          const isCompleted = Math.random() > 0.7; // Randomly true ~30% of the time
-          week.push(isCompleted);
-        }
-        data.push(week);
-      }
-      setActivityData(data);
-    };
 
-    // Only run on the client
-    if (typeof window !== 'undefined') {
-      generateActivityData();
-    }
-  }, []); // Empty dependency array means this runs once on mount
 
   useEffect(() => {
     const storedMode = localStorage.getItem('darkMode');
@@ -380,19 +365,90 @@ export default function Home() {
     }
   };
 
+  // Listen for auth changes to get userId
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      setUserId(user ? user.uid : null);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time sync for meta (streak, day count)
+  useEffect(() => {
+    if (!userId) return;
+    const metaRef = doc(db, 'users', userId);
+    const unsub = onSnapshot(metaRef, (docSnap) => {
+      const data = docSnap.data();
+      if (data) {
+        setStreak(data.currentStreak || 1);
+        // Day count = streak or a separate field, fallback to streak
+        setDayCount(data.currentStreak || 1);
+      }
+    });
+    return () => unsub();
+  }, [userId]);
+
+  // Real-time sync for dailyLogs (today's tasks)
+  useEffect(() => {
+    if (!userId) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const logRef = doc(db, 'users', userId, 'dailyLogs', today);
+    const unsub = onSnapshot(logRef, (docSnap) => {
+      const data = docSnap.data();
+      if (data && data.tasks) {
+        setTasks(data.tasks);
+      }
+    });
+    return () => unsub();
+  }, [userId]);
+
+  // Update Firestore when checkboxes change
+  useEffect(() => {
+    if (!userId) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const logRef = doc(db, 'users', userId, 'dailyLogs', today);
+    setDoc(logRef, { tasks }, { merge: true });
+  }, [tasks, userId]);
+
+  // Update meta (streak, etc.) when all tasks are completed for today
+  useEffect(() => {
+    if (!userId) return;
+    const allComplete = tasks.length > 0 && tasks.every(t => t.completed);
+    if (allComplete && auth.currentUser) {
+      updateUserStats(auth.currentUser);
+    }
+  }, [tasks, userId]);
+
+  // Generate activity data from Firestore dailyLogs (GitHub-style: today is last cell in last column)
+  useEffect(() => {
+    if (!userId) return;
+    const fetchActivityData = async () => {
+      const dailyLogsRef = collection(db, 'users', userId, 'dailyLogs');
+      const snapshot = await getDocs(dailyLogsRef);
+      // Map date strings to completion status
+      const completed: Record<string, boolean> = {};
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data && Array.isArray(data.tasks)) {
+          completed[docSnap.id] = data.tasks.length > 0 && data.tasks.every((t: any) => t.completed);
+        }
+      });
+      setCompletedDays(completed);
+    };
+    fetchActivityData();
+  }, [userId]);
+
   return (
     <main
       style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
+        minHeight: "100vh",
+        width: "100vw",
         backgroundColor,
         backgroundSize: "25px 25px",
-        backgroundImage: `linear-gradient(to right, ${lineColor} 1px, transparent 1px),
-                          linear-gradient(to bottom, ${lineColor} 1px, transparent 1px)`,
+        backgroundImage: `linear-gradient(to right, ${lineColor} 1px, transparent 1px),\n                          linear-gradient(to bottom, ${lineColor} 1px, transparent 1px)`,
         position: "relative",
         paddingTop: "30px", // Adjusted padding to account for the new menu bar height
+        overflow: 'hidden',
       }}
     >
       <MenuBar />
@@ -402,19 +458,21 @@ export default function Home() {
         onClick={() => setDarkMode(!darkMode)}
         style={{
           position: "absolute",
-          top: "35px", // Moved down to account for menu bar and a bit more space
+          top: "35px",
           left: "10px",
-          width: "20px",
-          height: "20px",
+          width: "22px",
+          height: "22px",
           backgroundColor: darkMode ? "#888" : "#ddd",
-          opacity: 0.3,
+          opacity: 0.7,
           border: "none",
           borderRadius: "50%",
           cursor: "pointer",
+          zIndex: 30,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.10)'
         }}
         aria-label="Toggle theme"
         title="Toggle theme"
-      ></button>
+      />
 
       {/* Folder Icons */}
       <div
@@ -424,6 +482,7 @@ export default function Home() {
           left: "100px",
           display: "flex",
           gap: "40px",
+          zIndex: 25,
         }}
       >
         {[
@@ -431,7 +490,13 @@ export default function Home() {
           { label: "Journal", icon: "/folder-icon.png" },
           { label: "Leaderboard", icon: "/folder-icon.png" },
         ].map((folder, index) => (
-          <div key={index} style={{ textAlign: "center" }}>
+          <div key={index} style={{ textAlign: "center", cursor: "pointer" }}
+            onClick={() => {
+              if (folder.label === "Journal") setShowJournal(true);
+              if (folder.label === "More Info") setShowInstructionsModal(true);
+              if (folder.label === "Leaderboard") setShowLeaderboard(true);
+            }}
+          >
             <img
               src={folder.icon}
               alt={folder.label}
@@ -439,12 +504,10 @@ export default function Home() {
                 width: "64px",
                 height: "64px",
                 cursor: "pointer",
+                transition: 'transform 0.18s cubic-bezier(.4,2,.6,1)',
               }}
-              onClick={() => {
-                if (folder.label === "Journal") setShowJournal(true);
-                if (folder.label === "More Info") setShowInstructionsModal(true);
-                if (folder.label === "Leaderboard") setShowLeaderboard(true);
-              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.08)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
             />
             <p
               style={{
@@ -461,105 +524,6 @@ export default function Home() {
         ))}
       </div>
 
-      {/* GitHub-style Activity Graph */}
-      <div style={{
-        position: "absolute",
-        top: "calc(50% + 60px)", // Position below the centered CS75HARD text
-        left: "50%",
-        transform: "translateX(-50%)",
-        width: "auto", // Adjust width based on content
-        padding: '20px',
-        background: darkMode ? "#2d2d2d" : "#ededed", // Dark or light background
-        borderRadius: '10px',
-        boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-        color: textColor,
-        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}>
-        {/* Title and Stats */}
-        <div style={{
-          width: '100%',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '15px',
-          fontSize: '14px',
-        }}>
-          <div style={{ fontWeight: 'bold', fontSize: '16px' }}>
-            Activity in the past year <span style={{ fontSize: '12px', color: darkMode ? '#aaa' : '#555', cursor: 'help' }}>ⓘ</span>
-          </div>
-          <div style={{ color: darkMode ? '#ccc' : '#333' }}>
-            {/* These stats would be dynamic in a real app */}
-            Total active days: <span style={{ fontWeight: 'bold' }}>--</span> Max streak: <span style={{ fontWeight: 'bold' }}>--</span>
-          </div>
-        </div>
-
-        {/* Activity Grid */}
-        <div style={{
-          display: 'flex',
-          gap: '2px', // Gap between week columns
-        }}>
-           {/* Days of the week labels - Optional, but common */}
-           {/*
-           <div style={{
-             display: 'flex', 
-             flexDirection: 'column', 
-             gap: '2px', 
-             fontSize: '10px', 
-             color: darkMode ? '#aaa' : '#555',
-             textAlign: 'right',
-             paddingRight: '4px',
-             justifyContent: 'space-between',
-             height: 'calc(10px * 7 + 2px * 6)', // Match grid height
-           }}>
-               <span>Mon</span>
-               <span>Wed</span>
-               <span>Fri</span>
-           </div>
-           */}
-
-          {/* Render Grid based on activityData state */}
-          {activityData.map((week, weekIndex) => (
-            <div key={weekIndex} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-               {week.map((isCompleted, dayIndex) => {
-                 const color = isCompleted 
-                               ? '#5AC8FA' // Use the CS75HARD hover blue
-                               : (darkMode ? '#1b1b1b' : '#d3d6db'); // Light grey for incomplete in light mode
-
-                 return (
-                   <div 
-                     key={`${weekIndex}-${dayIndex}`}
-                     style={{
-                       width: '10px',
-                       height: '10px',
-                       background: color,
-                       borderRadius: '2px',
-                     }}
-                   />
-                 );
-               })}
-            </div>
-          ))}
-        </div>
-         {/* Month Labels - Approximate positioning */}
-        <div style={{
-          width: '100%',
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: '12px',
-          marginTop: '5px',
-          padding: '0 5px', // Match grid padding
-          color: darkMode ? '#ccc' : '#333',
-        }}>
-          {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map(month => (
-            // Approximate width for month columns - needs more precise calculation for perfect alignment
-            <span key={month} style={{ width: 'calc(10px * 4 + 2px * 3)', textAlign: 'center' }}>{month}</span> 
-          ))}
-        </div>
-      </div>
-
       {/* macOS-style Dock with custom icons and colored blocks */}
       <div
         style={{
@@ -569,14 +533,15 @@ export default function Home() {
           transform: "translateX(-50%)",
           display: "flex",
           alignItems: "center",
-          padding: "2px", // Reduced padding
+          padding: "2px",
           backgroundColor: darkMode ? "#bdbdbd" : "#cccccc",
           backdropFilter: "blur(16px)",
           borderRadius: "22px",
           boxShadow: "0 4px 16px rgba(0,0,0,0.14)",
           minHeight: "60px",
-          minWidth: "420px", // Adjusted minWidth as we have fewer items initially
+          minWidth: "420px",
           gap: 0,
+          zIndex: 22,
         }}
       >
         {/* Dock items (icon and colored blocks) */}
@@ -593,10 +558,10 @@ export default function Home() {
         ].map((item, idx, arr) => {
           // Styles for both icons and colored blocks
           const itemStyles = {
-            width: "50px", // Slightly larger size for icons/blocks
-            height: "50px", // Slightly larger size
-            borderRadius: "14px", // Adjusted border radius
-            margin: "0 6px", // Keep margin relatively small
+            width: "50px",
+            height: "50px",
+            borderRadius: "14px",
+            margin: "0 6px",
             display: "inline-block",
             boxShadow: "0 1.5px 6px rgba(0,0,0,0.12)",
             transition: "transform 0.18s cubic-bezier(.4,2,.6,1)",
@@ -606,13 +571,27 @@ export default function Home() {
           let itemElement;
           if (item.type === 'icon') {
             itemElement = (
-              <div style={{ position: 'relative' }} // Wrapper for relative positioning of tooltip
-                 onMouseEnter={() => { // Add mouse enter to wrapper
-                   if (item.alt === "Settings") setShowLoginTooltip(true);
-                 }}
-                 onMouseLeave={() => { // Add mouse leave to wrapper
-                   if (item.alt === "Settings") setShowLoginTooltip(false);
-                 }}
+              <div style={{ position: 'relative', display: 'inline-block' }}
+                onMouseEnter={e => {
+                  (e.currentTarget.firstChild as HTMLElement).style.transform = "scale(1.08)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget.firstChild as HTMLElement).style.transform = "scale(1)";
+                }}
+                onClick={() => {
+                  if (item.alt === "Settings") {
+                    if (!auth.currentUser) {
+                      setShowLoginModal(true);
+                      setHasClickedSettings(true);
+                    } else {
+                      setShowSettingsMenu(true);
+                    }
+                  } else if (item.alt === "LeetCode") {
+                    setShowLeetcodeModal(true);
+                  } else if (item.alt === "Internship" && item.onClick) {
+                    item.onClick();
+                  }
+                }}
               >
                 <img
                   src={item.src}
@@ -621,89 +600,31 @@ export default function Home() {
                     ...itemStyles,
                     objectFit: "cover",
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = "scale(1.1)";
-                    if (item.alt === "LeetCode") {
-                      setShowLeetCodeTooltip(true);
-                    } // Removed state toggling for Settings from here
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = "scale(1)";
-                    if (item.alt === "LeetCode") {
-                      setShowLeetCodeTooltip(false);
-                    } // Removed state toggling for Settings from here
-                  }}
-                  onClick={() => {
-                    if (item.alt === "Settings") {
-                      setShowLoginModal(true);
-                      setHasClickedSettings(true); // Set state on click
-                    } else if (item.alt === "LeetCode") {
-                      setShowLeetcodeModal(true);
-                    }
-                  }}
                 />
-                 {/* LeetCode Tooltip */}
-                 {item.alt === "LeetCode" && showLeetCodeTooltip && (
-                    <div style={{
-                      position: 'absolute', // Position relative to the icon container
-                      bottom: 'calc(100% + 8px)', // Position above the icon with some space
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      background: '#fff', // White background
-                      color: '#000', // Black text
-                      padding: '8px 16px',
-                      borderRadius: '20px', // Pill shape
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      fontSize: '14px',
-                      whiteSpace: 'nowrap', // Prevent text wrapping
-                      zIndex: 10, // Ensure it's above other elements
-                      pointerEvents: 'none', // Allow clicking through the tooltip to the icon
-                    }}>
-                      open me
-                    </div>
-                 )}
-                 {/* Login Tooltip (for Settings icon) - Show permanently until clicked, then on hover */}
-                 {item.alt === "Settings" && (!hasClickedSettings || showLoginTooltip) && (
-                    <div style={{
-                      position: 'absolute', // Position relative to the icon container
-                      bottom: 'calc(100% + 8px)', // Position above the icon with some space
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      background: '#fff', // White background
-                      color: '#000', // Black text
-                      padding: '8px 16px',
-                      borderRadius: '20px', // Pill shape
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                      fontSize: '14px',
-                      whiteSpace: 'nowrap', // Prevent text wrapping
-                      zIndex: 10, // Ensure it's above other elements
-                      pointerEvents: 'none', // Allow clicking through the tooltip to the icon
-                    }}>
-                       log in
-                    </div>
-                 )}
+                {/* LeetCode Tooltip */}
+                {item.alt === "LeetCode" && showLeetCodeTooltip && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 8px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#fff',
+                    color: '#000',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.13)',
+                    zIndex: 100,
+                    whiteSpace: 'nowrap',
+                  }}>
+                    View LeetCode Stats
+                  </div>
+                )}
               </div>
             );
           }
-
-          return (
-            <React.Fragment key={idx}>
-              {itemElement}
-              {/* Add divider after certain blocks/icons */}
-              {(idx === 2 || idx === 5) && idx !== arr.length - 1 && (
-                <div
-                  style={{
-                    width: "1.5px",
-                    height: "36px", // Adjusted divider height
-                    background: darkMode ? "#aaa" : "#b0b0b0",
-                    borderRadius: "1px",
-                    margin: "0 8px", // Adjusted divider margin
-                    alignSelf: "center",
-                  }}
-                />
-              )}
-            </React.Fragment>
-          );
+          return itemElement;
         })}
       </div>
 
@@ -1002,7 +923,42 @@ export default function Home() {
           cursor: "pointer",
           zIndex: 5,
         }}
+        onClick={() => setShowTrashPopup(true)}
       />
+      {/* Mini popup for lost streaks */}
+      {showTrashPopup && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '110px',
+            right: '40px',
+            background: '#222',
+            color: '#fff',
+            padding: '16px 24px',
+            borderRadius: '10px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+            fontSize: '16px',
+            zIndex: 100,
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ marginBottom: 8 }}>Streaks lost: <b>{lostStreaks}</b></div>
+          <button
+            style={{
+              background: '#5AC8FA',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '6px 16px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+            onClick={() => setShowTrashPopup(false)}
+          >
+            Close
+          </button>
+        </div>
+      )}
 
       {/* Add Confetti component */}
       {showConfetti && (
@@ -1537,6 +1493,183 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Centered main challenge content */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        {/* Central DAY X of 75 display */}
+        <div
+          style={{
+            margin: '0 auto',
+            marginTop: '48px',
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+            fontWeight: 800,
+            fontSize: '48px',
+            color: '#5AC8FA',
+            letterSpacing: 1.5,
+            textAlign: 'center',
+            textShadow: '0 2px 8px rgba(90,200,250,0.08)',
+          }}
+        >
+          DAY {dayCount} of 75
+        </div>
+
+        {/* Activity Grid: 5 rows x 15 columns, fill by columns (top-to-bottom, left-to-right), always start from challenge start date */}
+        <div style={{
+          margin: '32px auto 0 auto',
+          padding: '20px',
+          background: darkMode ? "#2d2d2d" : "#ededed",
+          borderRadius: '10px',
+          boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+          color: textColor,
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          maxWidth: '340px',
+        }}>
+          {/* Title */}
+          <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '8px', width: '100%', textAlign: 'left' }}>
+            Activity in the past year <span style={{ fontSize: '12px', color: darkMode ? '#aaa' : '#555', cursor: 'help' }}>ⓘ</span>
+          </div>
+          {/* Stats */}
+          <div style={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: '15px',
+            color: darkMode ? '#ccc' : '#333',
+            marginBottom: '14px',
+            fontWeight: 500,
+          }}>
+            <span>Total active days: {(() => {
+              // Calculate total active days
+              let startDate;
+              const logDates = Object.keys(completedDays).sort();
+              if (logDates.length > 0) {
+                startDate = new Date(logDates[0]);
+              } else {
+                startDate = new Date();
+              }
+              const days: boolean[] = [];
+              for (let i = 0; i < 75; i++) {
+                const day = new Date(startDate);
+                day.setDate(startDate.getDate() + i);
+                const dateStr = day.toISOString().slice(0, 10);
+                days.push(!!completedDays[dateStr]);
+              }
+              let resetIdx = days.findIndex((d, i) => i > 0 && !d && days[i-1]);
+              if (resetIdx !== -1) {
+                for (let i = resetIdx; i < days.length; i++) days[i] = false;
+              }
+              return days.filter(Boolean).length;
+            })()}</span>
+            <span>Max streak: {(() => {
+              let startDate;
+              const logDates = Object.keys(completedDays).sort();
+              if (logDates.length > 0) {
+                startDate = new Date(logDates[0]);
+              } else {
+                startDate = new Date();
+              }
+              const days: boolean[] = [];
+              for (let i = 0; i < 75; i++) {
+                const day = new Date(startDate);
+                day.setDate(startDate.getDate() + i);
+                const dateStr = day.toISOString().slice(0, 10);
+                days.push(!!completedDays[dateStr]);
+              }
+              let resetIdx = days.findIndex((d, i) => i > 0 && !d && days[i-1]);
+              if (resetIdx !== -1) {
+                for (let i = resetIdx; i < days.length; i++) days[i] = false;
+              }
+              let maxStreak = 0, currentStreak = 0;
+              for (let i = 0; i < days.length; i++) {
+                if (days[i]) {
+                  currentStreak++;
+                  if (currentStreak > maxStreak) maxStreak = currentStreak;
+                } else {
+                  currentStreak = 0;
+                }
+              }
+              return maxStreak;
+            })()}</span>
+          </div>
+          {/* Activity Grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(15, 16px)',
+            gridTemplateRows: 'repeat(5, 16px)',
+            gap: '2px',
+            margin: '0 auto',
+            marginTop: '0',
+            justifyContent: 'center',
+          }}>
+            {(() => {
+              // Determine challenge start date
+              let startDate;
+              const logDates = Object.keys(completedDays).sort();
+              if (logDates.length > 0) {
+                startDate = new Date(logDates[0]);
+              } else {
+                startDate = new Date();
+              }
+              // Build a 75-day array starting from startDate
+              const days: boolean[] = [];
+              for (let i = 0; i < 75; i++) {
+                const day = new Date(startDate);
+                day.setDate(startDate.getDate() + i);
+                const dateStr = day.toISOString().slice(0, 10);
+                days.push(!!completedDays[dateStr]);
+              }
+              // If a user misses a day, reset the grid
+              let resetIdx = days.findIndex((d, i) => i > 0 && !d && days[i-1]);
+              if (resetIdx !== -1) {
+                for (let i = resetIdx; i < days.length; i++) days[i] = false;
+              }
+              // Find the next day to fill (first false in days)
+              const nextIdx = days.findIndex(d => !d);
+              const highlightIdx = nextIdx === -1 ? days.length - 1 : nextIdx;
+              // Render by rows, but fill by column-major order
+              const gridSquares = [];
+              for (let row = 0; row < 5; row++) {
+                for (let col = 0; col < 15; col++) {
+                  const idx = row + col * 5;
+                  if (idx < 75) {
+                    let style = {
+                      width: '16px',
+                      height: '16px',
+                      background: (idx < nextIdx) ? '#5AC8FA' : (darkMode ? '#1b1b1b' : '#d3d6db'),
+                      borderRadius: '3px',
+                      border: (idx === highlightIdx) ? '2px solid #5AC8FA' : 'none',
+                    };
+                    if (idx === highlightIdx) {
+                      style.background = 'transparent'; // outlined, not filled
+                    }
+                    gridSquares.push(
+                      <div
+                        key={idx}
+                        style={style}
+                        title={`Day ${idx + 1}${idx === highlightIdx ? ' (Today)' : ''}`}
+                      />
+                    );
+                  }
+                }
+              }
+              return gridSquares;
+            })()}
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

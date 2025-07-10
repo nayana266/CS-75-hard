@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { auth } from '@/lib/firebaseConfig'
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -39,6 +39,20 @@ export function LoginForm({
       setLoading(false)
     }
   }
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      router.push('/');
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -79,8 +93,8 @@ export function LoginForm({
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Logging in...' : 'Login'}
                 </Button>
-                <Button variant="outline" className="w-full" type="button" disabled={loading}>
-                  Login with Google
+                <Button variant="outline" className="w-full" type="button" disabled={loading} onClick={handleGoogleSignIn}>
+                  {loading ? 'Logging in...' : 'Login with Google'}
                 </Button>
               </div>
               {error && <div className="text-red-500 text-sm text-center mt-2">{error}</div>}
