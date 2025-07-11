@@ -48,10 +48,10 @@ export async function POST(request: Request) {
     const recentSolved: string[] = [];
 
     const processedData = {
-      totalSolved: stats.find((s: unknown) => (s as any).difficulty === 'All')?.count || 0,
-      easySolved: stats.find((s: unknown) => (s as any).difficulty === 'Easy')?.count || 0,
-      mediumSolved: stats.find((s: unknown) => (s as any).difficulty === 'Medium')?.count || 0,
-      hardSolved: stats.find((s: unknown) => (s as any).difficulty === 'Hard')?.count || 0,
+      totalSolved: stats.find((s: unknown) => (s as { difficulty: string, count: number }).difficulty === 'All')?.count || 0,
+      easySolved: stats.find((s: unknown) => (s as { difficulty: string, count: number }).difficulty === 'Easy')?.count || 0,
+      mediumSolved: stats.find((s: unknown) => (s as { difficulty: string, count: number }).difficulty === 'Medium')?.count || 0,
+      hardSolved: stats.find((s: unknown) => (s as { difficulty: string, count: number }).difficulty === 'Hard')?.count || 0,
       recentSolved,
     };
 

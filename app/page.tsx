@@ -8,6 +8,15 @@ import { collection, getDocs, query, orderBy, limit, doc, getDoc, setDoc, onSnap
 import { db } from '@/lib/firestore';
 import MenuBar from './components/MenuBar';
 
+// Add interface for leaderboard users
+interface LeaderboardUser {
+  id: string;
+  displayName?: string;
+  avatarUrl?: string;
+  longestStreak?: number;
+  totalPoints?: number;
+}
+
 export default function Home() {
   const [darkMode, setDarkMode] = useState(true);
   const [showJournal, setShowJournal] = useState(false);
@@ -78,7 +87,7 @@ export default function Home() {
 
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardTab, setLeaderboardTab] = useState<'streak' | 'points'>('streak');
-  const [leaderboardUsers, setLeaderboardUsers] = useState<any[]>([]);
+  const [leaderboardUsers, setLeaderboardUsers] = useState<LeaderboardUser[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
   const [showLeetcodeModal, setShowLeetcodeModal] = useState(false);
