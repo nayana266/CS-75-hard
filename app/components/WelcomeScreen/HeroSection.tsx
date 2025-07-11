@@ -6,9 +6,11 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 interface HeroSectionProps {
   darkMode: boolean;
   style?: React.CSSProperties;
+  onStartChallenge: () => void;
+  onLogin: () => void;
 }
 
-const HeroSection: React.FC<HeroSectionProps> = ({ darkMode, style }) => {
+const HeroSection: React.FC<HeroSectionProps> = ({ darkMode, style, onStartChallenge, onLogin }) => {
   const [cs75Hover, setCs75Hover] = React.useState(false);
 
   // Define colors based on dark mode for inline styles if needed, though CSS vars are preferred
