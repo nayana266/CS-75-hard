@@ -7,6 +7,7 @@ import { updateUserStats } from '@/lib/firestoreHelpers';
 import { collection, getDocs, query, orderBy, limit, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firestore';
 import MenuBar from './components/MenuBar';
+import ProfileModal from '../components/profile-modal';
 
 // Add interface for leaderboard users
 interface LeaderboardUser {
@@ -106,6 +107,7 @@ export default function Home() {
 
   const [dayCount, setDayCount] = useState(1);
   const [userId, setUserId] = useState<string | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const backgroundColor = darkMode ? "#333" : "#fff";
   const lineColor = darkMode ? "#4b4a4a" : "#eee";
@@ -455,7 +457,7 @@ export default function Home() {
           { label: "Journal", icon: "/folder-icon.png" },
           { label: "Leaderboard", icon: "/folder-icon.png" },
         ].map((folder, index) => (
-          <div key={index} style={{ textAlign: "center", cursor: "pointer" }}
+          <div key={folder.label} style={{ textAlign: "center", cursor: "pointer" }}
             onClick={() => {
               if (folder.label === "Journal") setShowJournal(true);
               if (folder.label === "More Info") setShowInstructionsModal(true);
@@ -520,7 +522,7 @@ export default function Home() {
           { type: 'icon', src: "/leetcode.png", alt: "LeetCode" },
           { type: 'icon', src: "/githubdark.png", alt: "GitHub" },
           { type: 'icon', src: "/briefcase.png", alt: "Internship", onClick: () => setShowInternshipModal(true) },
-        ].map((item) => {
+        ].map((item, idx) => {
           // Styles for both icons and colored blocks
           const itemStyles = {
             width: "50px",
@@ -536,7 +538,7 @@ export default function Home() {
           let itemElement;
           if (item.type === 'icon') {
             itemElement = (
-              <div style={{ position: 'relative', display: 'inline-block' }}
+              <div key={item.alt + idx} style={{ position: 'relative', display: 'inline-block' }}
                 onMouseEnter={e => {
                   (e.currentTarget.firstChild as HTMLElement).style.transform = "scale(1.08)";
                 }}
@@ -544,7 +546,9 @@ export default function Home() {
                   (e.currentTarget.firstChild as HTMLElement).style.transform = "scale(1)";
                 }}
                 onClick={() => {
-                  if (item.alt === "Settings") {
+                  if (item.alt === "Contacts") {
+                    setShowProfileModal(true);
+                  } else if (item.alt === "Settings") {
                     if (!auth.currentUser) {
                       setShowLoginModal(true);
                     } else {
@@ -786,7 +790,7 @@ export default function Home() {
         <ul style={{ listStyle: "none", padding: 0, margin: 0, flex: 1, overflowY: "auto", marginBottom: "12px" }}>
           {tasks.map((task, index) => (
             <li
-              key={index}
+              key={task.text + index}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -1153,7 +1157,7 @@ export default function Home() {
                     <h4 style={{ margin: '0 0 8px 0', fontSize: '14px' }}>Recently Solved:</h4>
                     <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: '13px' }}>
                       {leetcodeData.recentSolved.slice(0, 5).map((problem, index) => (
-                        <li key={index}>{problem}</li>
+                        <li key={problem + index}>{problem}</li>
                       ))}
                     </ul>
                   </div>
@@ -1634,6 +1638,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+      <ProfileModal open={showProfileModal} onClose={() => setShowProfileModal(false)} darkMode={darkMode} />
     </main>
   );
 }
